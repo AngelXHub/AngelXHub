@@ -1,106 +1,161 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Aura 22</title>
-
-<style>
-body {
-    margin: 0;
-    padding: 0;
-    background-color: #000;
-    text-align: center;
-    font-family: Arial, sans-serif;
-}
-
-.titulo {
-    font-size: 90px;
-    font-weight: bold;
-    margin-top: 50px;
-    background: linear-gradient(90deg, red, orange, yellow, green, blue, purple);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: animacao 4s infinite linear;
-}
-
-@keyframes animacao {
-    0% { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
-}
-
-.galeria {
-    margin-top: 50px;
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-
-.galeria img {
-    width: 250px;
-    border-radius: 15px;
-    box-shadow: 0 0 20px purple;
-    cursor: pointer;
-    transition: transform 0.3s;
-}
-
-.galeria img:hover {
-    transform: scale(1.1);
-}
-
-/* Modal */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    padding-top: 60px;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.9);
-}
-
-.modal img {
-    margin: auto;
-    display: block;
-    width: 80%;
-    max-width: 800px;
-    border-radius: 20px;
-}
-
-</style>
+    <title>Mini Clash Arena - 2 Players</title>
+    <style>
+        body { margin: 0; background: #222; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; color: white; }
+        canvas { background: #4CAF50; border: 5px solid #333; box-shadow: 0 0 20px rgba(0,0,0,0.5); margin-top: 20px; }
+        .ui { margin-top: 10px; text-align: center; }
+    </style>
 </head>
-
 <body>
 
-<div class="titulo">
-    FOTOS AURA
-</div>
-
-<div class="galeria">
-    <img src="Aura22.jpg" onclick="abrirModal(this.src)">
-    <img src="Imagem2.jpg" onclick="abrirModal(this.src)">
-    <img src="Imagem3.jpg" onclick="abrirModal(this.src)">
-    <img src="Imagem4.jpg" onclick="abrirModal(this.src)">
-    <img src="Imagem5.jpg" onclick="abrirModal(this.src)">
-</div>
-
-<!-- Modal -->
-<div id="meuModal" class="modal" onclick="fecharModal()">
-    <img id="imagemModal">
-</div>
+    <div class="ui">
+        <h2>Mini Clash Arena</h2>
+        <p>P1: WASD + Espaço | P2: Setas + Enter</p>
+    </div>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
 
 <script>
-function abrirModal(src) {
-    document.getElementById("meuModal").style.display = "block";
-    document.getElementById("imagemModal").src = src;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Configurações Globais
+const bullets = [];
+const keys = {};
+
+// Classe Entidade (Torres e Jogadores)
+class Entity {
+    constructor(x, y, width, height, color, hp, isTower = false) {
+        this.x = x; this.y = y;
+        this.width = width; this.height = height;
+        this.color = color; this.hp = hp; this.maxHp = hp;
+        this.isTower = isTower;
+        this.speed = 4;
+        this.lastShot = 0;
+    }
+
+    draw() {
+        // Desenha Sombra
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(this.x + 5, this.y + 5, this.width, this.height);
+        
+        // Desenha Corpo
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // Barra de Vida
+        const barW = this.width;
+        ctx.fillStyle = 'red';
+        ctx.fillRect(this.x, this.y - 15, barW, 8);
+        ctx.fillStyle = '#00FF00';
+        ctx.fillRect(this.x, this.y - 15, barW * (this.hp / this.maxHp), 8);
+    }
 }
 
-function fecharModal() {
-    document.getElementById("meuModal").style.display = "none";
+// Inicialização
+const p1 = new Entity(100, 180, 40, 40, '#3498db', 100);
+const p2 = new Entity(660, 180, 40, 40, '#e74c3c', 100);
+const t1 = new Entity(20, 150, 60, 100, '#2980b9', 500, true);
+const t2 = new Entity(720, 150, 60, 100, '#c0392b', 500, true);
+
+// Input Listeners
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+function shoot(player, direction) {
+    const now = Date.now();
+    if (now - player.lastShot > 400) {
+        bullets.push({
+            x: player.x + player.width/2,
+            y: player.y + player.height/2,
+            velX: direction * 7,
+            owner: player
+        });
+        player.lastShot = now;
+    }
 }
+
+function update() {
+    // Movimento P1
+    if (keys['KeyW'] && p1.y > 0) p1.y -= p1.speed;
+    if (keys['KeyS'] && p1.y < canvas.height - p1.height) p1.y += p1.speed;
+    if (keys['KeyA'] && p1.x > 80) p1.x -= p1.speed; // Limite da ponte
+    if (keys['KeyD'] && p1.x < 350) p1.x += p1.speed;
+    if (keys['Space']) shoot(p1, 1);
+
+    // Movimento P2
+    if (keys['ArrowUp'] && p2.y > 0) p2.y -= p2.speed;
+    if (keys['ArrowDown'] && p2.y < canvas.height - p2.height) p2.y += p2.speed;
+    if (keys['ArrowLeft'] && p2.x > 450) p2.x -= p2.speed;
+    if (keys['ArrowRight'] && p2.x < 680) p2.x += p2.speed;
+    if (keys['Enter']) shoot(p2, -1);
+
+    // Balas e Colisões
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.x += b.velX;
+
+        // Colisão com Torres
+        if (b.owner === p1 && b.x > t2.x) {
+            t2.hp -= 10;
+            bullets.splice(i, 1);
+        } else if (b.owner === p2 && b.x < t1.x + t1.width) {
+            t1.hp -= 10;
+            bullets.splice(i, 1);
+        }
+        // Colisão com Jogadores
+        else if (b.owner === p1 && b.x > p2.x && b.x < p2.x + p2.width && b.y > p2.y && b.y < p2.y + p2.height) {
+            p2.hp -= 5;
+            bullets.splice(i, 1);
+        }
+        else if (b.owner === p2 && b.x < p1.x + p1.width && b.x > p1.x && b.y > p1.y && b.y < p1.y + p1.height) {
+            p1.hp -= 5;
+            bullets.splice(i, 1);
+        }
+        // Remover balas fora da tela
+        else if (b.x < 0 || b.x > canvas.width) {
+            bullets.splice(i, 1);
+        }
+    }
+
+    if (t1.hp <= 0 || t2.hp <= 0) {
+        alert(t1.hp <= 0 ? "JOGADOR 2 VENCEU!" : "JOGADOR 1 VENCEU!");
+        location.reload();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Desenha Rio Central
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(canvas.width/2 - 20, 0, 40, canvas.height);
+
+    // Desenha Pontes
+    ctx.fillStyle = '#8d6e63';
+    ctx.fillRect(canvas.width/2 - 30, 50, 60, 60);
+    ctx.fillRect(canvas.width/2 - 30, 290, 60, 60);
+
+    // Desenha Entidades
+    t1.draw(); t2.draw();
+    p1.draw(); p2.draw();
+
+    // Desenha Balas
+    bullets.forEach(b => {
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    requestAnimationFrame(() => {
+        update();
+        draw();
+    });
+}
+
+draw();
 </script>
-
 </body>
 </html>
